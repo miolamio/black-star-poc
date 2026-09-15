@@ -1,0 +1,17 @@
+{
+  "name": "gargantua-schwarzschild-raytracer",
+  "version": "1.0.0",
+  "description": "GARGANTUA — full-screen Schwarzschild black hole null-geodesic raytracer (Three.js, WebGL2, no build step)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node verify/serve.mjs 8080",
+    "test:geodesic": "node verify/geodesic.test.mjs",
+    "test:browser": "node verify/verify.mjs",
+    "verify": "node verify/geodesic.test.mjs && node verify/verify.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0"
+  },
+  "license": "MIT"
+}

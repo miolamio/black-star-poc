@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>GARGANTUA — Schwarzschild Black Hole Raytracer</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23f2a640'/%3E%3Ccircle cx='32' cy='32' r='17' fill='%23000'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./css/style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./lib/three/three.module.js",
+        "three/addons/": "./lib/three/addons/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="view" aria-label="Black hole raytracer viewport"></canvas>
+
+  <div id="ui">
+    <header id="title">
+      <h1>GARGANTUA</h1>
+      <p>Schwarzschild black hole · null-geodesic raytracer · rs = 1</p>
+    </header>
+    <div id="hud"></div>
+    <div id="gui"></div>
+  </div>
+
+  <div id="overlay" class="overlay">
+    <div class="overlay-box">
+      <div class="spinner"></div>
+      <h2 id="overlay-title">Loading GARGANTUA…</h2>
+      <p id="overlay-msg">Fetching modules.</p>
+    </div>
+  </div>
+
+  <script>
+    // Pre-module safety net: if a module fails to load or parse, say so instead of
+    // leaving a black screen. Removed once the app marks itself ready.
+    window.addEventListener('error', function (e) {
+      if (document.body.dataset.ready === '1') return;
+      var o = document.getElementById('overlay');
+      if (!o) return;
+      o.hidden = false;
+      o.classList.add('error');
+      var s = o.querySelector('.spinner'); if (s) s.hidden = true;
+      document.getElementById('overlay-title').textContent = 'GARGANTUA could not start';
+      document.getElementById('overlay-msg').textContent = (e.message || 'Unknown error') + (e.filename ? '\n' + e.filename.replace(location.origin, '') + ':' + e.lineno : '');
+    });
+  </script>
+
+  <noscript>
+    <div class="overlay">
+      <div class="overlay-box"><h2>JavaScript is required</h2><p>GARGANTUA renders in a WebGL 2 fragment shader driven by ES modules.</p></div>
+    </div>
+  </noscript>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

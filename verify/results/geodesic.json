@@ -1,0 +1,148 @@
+{
+  "date": "2026-09-15T09:04:44.068Z",
+  "failures": 0,
+  "results": [
+    {
+      "name": "deflection b=10: reference vs PN series",
+      "ok": true,
+      "b": 10,
+      "reference": 0.23613490821105054,
+      "series": 0.2358488131467424,
+      "relError": 0.0012130443248410628,
+      "tolerance": 0.004,
+      "note": "ref 0.236135 rad, series 0.235849 rad, rel err 0.121%"
+    },
+    {
+      "name": "deflection b=10: shader step (high) vs reference",
+      "ok": true,
+      "b": 10,
+      "shader": 0.2361349521504528,
+      "reference": 0.23613490821105054,
+      "relError": 1.8607753757561026e-7,
+      "steps": 394,
+      "tolerance": 0.005,
+      "note": "394 RK4 steps, rel err 0.000%"
+    },
+    {
+      "name": "deflection b=10: shader step (low) vs reference",
+      "ok": true,
+      "b": 10,
+      "shader": 0.23613518896961758,
+      "reference": 0.23613490821105054,
+      "relError": 0.0000011889752733339113,
+      "steps": 248,
+      "tolerance": 0.01,
+      "note": "248 RK4 steps, rel err 0.000%"
+    },
+    {
+      "name": "deflection b=20: reference vs PN series",
+      "ok": true,
+      "b": 20,
+      "reference": 0.10810379397919384,
+      "series": 0.10809621499139305,
+      "relError": 0.00007011335042024508,
+      "tolerance": 0.002,
+      "note": "ref 0.108104 rad, series 0.108096 rad, rel err 0.007%"
+    },
+    {
+      "name": "deflection b=20: shader step (high) vs reference",
+      "ok": true,
+      "b": 20,
+      "shader": 0.10810379469625993,
+      "reference": 0.10810379397919384,
+      "relError": 6.633126004825399e-9,
+      "steps": 740,
+      "tolerance": 0.003,
+      "note": "740 RK4 steps, rel err 0.000%"
+    },
+    {
+      "name": "deflection b=20: shader step (low) vs reference",
+      "ok": true,
+      "b": 20,
+      "shader": 0.10810379761788508,
+      "reference": 0.10810379397919384,
+      "relError": 3.3659237139326805e-8,
+      "steps": 466,
+      "tolerance": 0.006,
+      "note": "466 RK4 steps, rel err 0.000%"
+    },
+    {
+      "name": "deflection b=40: reference vs PN series",
+      "ok": true,
+      "b": 40,
+      "reference": 0.05192840322828527,
+      "series": 0.05192826281272581,
+      "relError": 0.000002704029594903562,
+      "tolerance": 0.002,
+      "note": "ref 0.051928 rad, series 0.051928 rad, rel err 0.000%"
+    },
+    {
+      "name": "deflection b=40: shader step (high) vs reference",
+      "ok": true,
+      "b": 40,
+      "shader": 0.05192840337855714,
+      "reference": 0.05192840322828527,
+      "relError": 2.893828078531483e-9,
+      "steps": 1471,
+      "tolerance": 0.002,
+      "note": "1471 RK4 steps, rel err 0.000%"
+    },
+    {
+      "name": "deflection b=40: shader step (low) vs reference",
+      "ok": true,
+      "b": 40,
+      "shader": 0.0519284042410948,
+      "reference": 0.05192840322828527,
+      "relError": 1.950396060195992e-8,
+      "steps": 927,
+      "tolerance": 0.004,
+      "note": "927 RK4 steps, rel err 0.000%"
+    },
+    {
+      "name": "angular momentum |x × v| conserved to 1e-6 (b=6)",
+      "ok": true,
+      "drift": 3.963741039096173e-9,
+      "note": "max relative drift 3.96e-9"
+    },
+    {
+      "name": "b=2.50 < b_c is captured by the horizon",
+      "ok": true,
+      "b": 2.5,
+      "bCrit": 2.598076211353316,
+      "steps": 93,
+      "note": "93 steps"
+    },
+    {
+      "name": "b=2.70 > b_c escapes to infinity",
+      "ok": true,
+      "b": 2.7,
+      "bCrit": 2.598076211353316,
+      "deflection": 2.9189887993015247,
+      "steps": 164,
+      "note": "deflection 167.2°"
+    },
+    {
+      "name": "numerical critical impact parameter matches 3√3/2",
+      "ok": true,
+      "measured": 2.5980357289314266,
+      "exact": 2.598076211353316,
+      "relError": 0.00001558169145018197,
+      "note": "b_c ≈ 2.59804 (exact 2.59808), rel err 0.002%"
+    },
+    {
+      "name": "b=2.62 loops around the photon sphere (total turning > 180°)",
+      "ok": true,
+      "b": 2.62,
+      "totalTurningDeg": 251.76548044109379,
+      "note": "total turning 251.8°"
+    },
+    {
+      "name": "ISCO redshift factors: approaching √2, receding √2/3, transverse 1/√2",
+      "ok": true,
+      "approaching": 1.414213562373095,
+      "receding": 0.47140452079103157,
+      "transverse": 0.7071067811865475,
+      "note": "g = 1.4142, 0.4714, 0.7071; beaming ratio (g³) 27.0:1"
+    }
+  ]
+}

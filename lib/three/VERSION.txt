@@ -1,0 +1,2 @@
+three@0.185.1
+Files copied from the official npm package "three" (build/three.module.js, build/three.core.js, examples/jsm/controls/OrbitControls.js, examples/jsm/libs/lil-gui.module.min.js). MIT license, see LICENSE.
