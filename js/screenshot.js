@@ -5,6 +5,7 @@
 //   &t=12.5            simulation time (seconds) used for disk turbulence and camera paths
 //   &seed=7            film-grain seed
 //   &journey=exit-music explicit deterministic performance capture (no recording needed)
+//   ?journey=off      open the laboratory without loading or playing the soundtrack
 //   &preset=quasar     preset key (interstellar | quasar | ember | lensing)
 //   &path=orbit        camera path key (orbit | flyby | plunge | rise | free)
 //   &cam=x,y,z         explicit camera position (rs units); implies path=free
@@ -17,7 +18,7 @@
 //   &download=1        also trigger a PNG download once the frame is ready
 //   &<param>=value     override any of the 21 live parameters, e.g. &exposure=1.4
 //
-// Every key except shot/download also works in interactive mode.
+// Laboratory parameters also work interactively with journey=off.
 
 import { PARAM_KEYS } from './params.js';
 
@@ -40,6 +41,7 @@ export function parseUrlConfig(search = window.location.search) {
     shot: q.get('shot') === '1' || q.get('shot') === 'true',
     download: q.get('download') === '1',
     journey: q.get('journey') === 'exit-music',
+    autoplay: q.get('journey') !== 'off',
     t: num(q.get('t'), null),
     seed: num(q.get('seed'), 1),
     preset: q.get('preset'),

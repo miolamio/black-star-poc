@@ -103,7 +103,7 @@ async function main() {
       else if (m.type() === 'warning' && !/GL Driver Message|ReadPixels/.test(text)) consoleWarnings.push(text.slice(0, 300));
     });
     page.on('pageerror', (e) => pageErrors.push(String(e.message).slice(0, 500)));
-    const url = base + query;
+    const url = base + query + (interactive ? `${query.includes('?') ? '&' : '?'}journey=off` : '');
     const t0 = Date.now();
     const entry = { name, url: query, ok: false, ms: 0, consoleErrors, consoleWarnings, pageErrors };
     try {

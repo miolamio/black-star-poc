@@ -49,21 +49,23 @@ export class MusicTransport {
     this.loaded = false;
   }
 
-  async load(file) {
+  loadUrl(url, name) { return this.load({ name }, url); }
+
+  async load(file, sourceUrl = null) {
     this.stop();
     this._release();
     const generation = ++this.generation;
     this.duration = 0;
     this.name = file?.name || '';
     this.error = this.warning = '';
-    if (!file || !file.size) { this.error = 'Choose a readable, nonempty audio file.'; this.notify(); return false; }
+    if (!file || (!sourceUrl && !file.size)) { this.error = 'Choose a readable, nonempty audio file.'; this.notify(); return false; }
     this.status = 'loading';
     this.notify();
     try {
       const audio = this.audio = this.audioFactory();
       audio.preload = 'auto';
       audio.loop = false;
-      this.url = this.createURL(file);
+      if (!sourceUrl) this.url = this.createURL(file);
       await new Promise((resolve, reject) => {
         const finish = (error) => {
           clearTimeout(timer);
@@ -78,7 +80,7 @@ export class MusicTransport {
         this.cancelLoad = () => finish(new Error('Recording selection replaced.'));
         audio.addEventListener('loadedmetadata', ready);
         audio.addEventListener('error', failed);
-        audio.src = this.url;
+        audio.src = sourceUrl || this.url;
         audio.load();
       });
       if (generation !== this.generation) return false;
@@ -149,7 +151,9 @@ export class MusicTransport {
       if (generation !== this.generation) return false;
       audio.pause();
       this.status = 'paused';
-      this.error = `Playback could not start. Press Start / Resume to retry. ${error.message || ''}`;
+      this.error = error.name === 'NotAllowedError'
+        ? 'Press Start to play the music and begin.'
+        : `Playback could not start. Press Start / Resume to retry. ${error.message || ''}`;
       this.notify();
       return false;
     }

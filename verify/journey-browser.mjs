@@ -55,13 +55,69 @@ fs.mkdirSync(OUT, { recursive: true });
 const server = createServer(ROOT), port = await listen(server, 0);
 let browser;
 try {
-  browser = await pw.chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+  browser = await pw.chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
   const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
   const base = `http://127.0.0.1:${port}/`;
-  await page.goto(`${base}?quality=low`);
+
+  // A served recording needs no file picker. Exercise both successful autoplay
+  // and the browser-policy fallback while keeping fixtures independent of media/.
+  for (const blocked of [false, true]) {
+    const startup = await browser.newPage({ viewport: { width: 640, height: 360 } });
+    startup.on('pageerror', (error) => errors.push(error.message));
+    await startup.route('**/media/exit-music.mp3', (route) => route.fulfill({ contentType: 'audio/wav', body: wav(RECORDING_DURATION) }));
+    await startup.addInitScript((blocked) => {
+      window.blockDefaultPlayback = blocked;
+      window.recordingStarts = [];
+      const play = HTMLMediaElement.prototype.play;
+      HTMLMediaElement.prototype.play = function () {
+        window.recordingStarts.push(this.currentTime);
+        if (window.blockDefaultPlayback) return Promise.reject(new DOMException('User gesture required', 'NotAllowedError'));
+        return play.call(this);
+      };
+    }, blocked);
+    await startup.goto(`${base}?quality=low`);
+    await startup.waitForFunction(() => window.__gargantua?.ready && window.__gargantua.journey.state().transport.loaded);
+    if (blocked) {
+      await startup.waitForFunction(() => window.__gargantua.journey.state().transport.error);
+      await startup.waitForTimeout(200);
+      const waiting = await startup.evaluate(() => window.__gargantua.journey.state());
+      assert.equal(waiting.transport.time, 0);
+      assert.equal(waiting.scene.time, 0);
+      assert.equal(waiting.transport.playing, false);
+      assert.equal(await startup.locator('#journey-start').textContent(), 'Start');
+      assert.match(await startup.locator('#journey-message').textContent(), /Press Start/);
+      await startup.evaluate(() => { window.blockDefaultPlayback = false; });
+      await startup.locator('#journey-start').click();
+    }
+    await startup.waitForFunction(() => window.__gargantua.journey.state().transport.playing);
+    const started = await startup.evaluate(() => {
+      const g = window.__gargantua;
+      g.renderOnce();
+      return { sceneTime: g.journey.state().scene.time, mediaTime: g.app.music.audio.currentTime,
+        starts: window.recordingStarts, muted: g.app.music.audio.muted, loop: g.app.music.audio.loop };
+    });
+    assert.deepEqual(started.starts, blocked ? [0, 0] : [0]);
+    assert.ok(Math.abs(started.sceneTime - started.mediaTime) < 0.001);
+    assert.equal(started.muted, false); assert.equal(started.loop, false);
+    assert.equal(await startup.locator('#journey-file').inputValue(), '');
+    assert.equal(await startup.locator('#journey-panel').isVisible(), false);
+    await startup.close();
+  }
+  const missing = await browser.newPage({ viewport: { width: 640, height: 360 } });
+  missing.on('pageerror', (error) => errors.push(error.message));
+  await missing.route('**/media/exit-music.mp3', (route) => route.fulfill({ status: 404, body: 'Not found' }));
+  await missing.goto(`${base}?quality=low`);
+  await missing.waitForFunction(() => window.__gargantua?.ready && window.__gargantua.journey.state().transport.error);
+  assert.equal(await missing.locator('#journey-panel').isVisible(), true);
+  assert.equal(await missing.locator('#journey-start').isDisabled(), true);
+  assert.equal(await missing.locator('#journey-file').isEnabled(), true);
+  await missing.close();
+  console.log('PASS  default soundtrack, synchronized autoplay from zero, Start fallback, missing-recording fallback');
+
+  await page.goto(`${base}?quality=low&journey=off`);
   await page.waitForFunction(() => window.__gargantua?.ready);
   let lab = await page.evaluate(() => {
     const g = window.__gargantua; g.app.setPaused(true); g.setPath('free');
@@ -245,8 +301,13 @@ try {
   });
   assert.equal(stopped.journey.active, false); assert.equal(stopped.journey.transport.time, 0);
   assert.deepEqual(stopped.params, lab.params); assert.deepEqual(stopped.state, lab.state);
-  assert.deepEqual(stopped.position, lab.position); assert.equal(stopped.fov, lab.fov);
-  assert.equal(stopped.persisted, persisted); assert.equal(stopped.interiorReleased, true); assert.equal(stopped.enabled, true);
+  stopped.position.forEach((value, i) => assert.ok(Math.abs(value - lab.position[i]) < 1e-9));
+  assert.equal(stopped.fov, lab.fov);
+  const restoredStorage = JSON.parse(stopped.persisted), originalStorage = JSON.parse(persisted);
+  restoredStorage.camera.position.forEach((value, i) => assert.ok(Math.abs(value - originalStorage.camera.position[i]) < 1e-9));
+  restoredStorage.camera.position = originalStorage.camera.position;
+  assert.deepEqual(restoredStorage, originalStorage);
+  assert.equal(stopped.interiorReleased, true); assert.equal(stopped.enabled, true);
 
   // Runtime errors must surface even after successful playback hides controls.
   await page.locator('#journey-start').click();

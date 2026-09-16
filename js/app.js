@@ -111,6 +111,7 @@ export class App {
       if (this.cfg.download) await this.saveScreenshot();
     } else {
       this.start();
+      if (this.cfg.autoplay) void this._loadDefaultRecording();
     }
   }
 
@@ -655,6 +656,19 @@ export class App {
   }
 
   // ------------------------------------------------------ music performance
+  async _loadDefaultRecording() {
+    const request = ++this.journeyRequest;
+    this.journeyUI.show();
+    const loaded = await this.music.loadUrl(
+      new URL('../media/exit-music.mp3', import.meta.url).href,
+      'Radiohead — Exit Music (For a Film)'
+    );
+    if (request !== this.journeyRequest || !loaded) return;
+    // Hold the opening frame if the browser requires a gesture for sound.
+    await this.seekJourney(0);
+    await this.journeyUI.run(() => this.startJourney(), true);
+  }
+
   _silenceSynth() {
     this.audio.disable();
     const { ctx, n } = this.audio;

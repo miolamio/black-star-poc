@@ -84,6 +84,22 @@ function harness(configure = () => {}) {
 }
 const file = { name: 'synthetic.wav', size: 100 };
 
+test('default URL recording starts at zero and is not revoked as a local blob', async () => {
+  const { transport: t, audios, revoked } = harness();
+  const url = 'http://localhost/media/exit-music.mp3';
+  assert.equal(await t.loadUrl(url, 'Exit Music'), true);
+  assert.equal(audios[0].src, url);
+  assert.equal(t.name, 'Exit Music');
+  assert.equal(t.time(), 0);
+  await t.play();
+  assert.equal(audios[0].currentTime, 0);
+  await t.load(file);
+  assert.equal(audios[0].src, '');
+  assert.deepEqual(revoked, []);
+  t.dispose();
+  assert.deepEqual(revoked, ['blob:fixture-1']);
+});
+
 test('audio is authoritative; seeks reconstruct, pause freezes, natural end starts silent monotonic tail', async () => {
   const { transport: t, audios, advance } = harness();
   assert.equal(await t.load(file), true);

@@ -22,6 +22,8 @@ const MIME = {
   '.md': 'text/markdown; charset=utf-8',
   '.wasm': 'application/wasm',
   '.map': 'application/json',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
 };
 
 export function createServer(root) {
@@ -44,13 +46,36 @@ export function createServer(root) {
           return;
         }
         const ext = path.extname(filePath).toLowerCase();
-        res.writeHead(200, {
+        const headers = {
           'Content-Type': MIME[ext] || 'application/octet-stream',
           'Content-Length': stat.size,
+          'Accept-Ranges': 'bytes',
           'Cache-Control': 'no-store',
           'Cross-Origin-Opener-Policy': 'same-origin',
-        });
-        fs.createReadStream(filePath).pipe(res);
+        };
+        // Single byte ranges let media elements seek without downloading the
+        // whole recording. Unsupported/multiple ranges receive the full file.
+        const range = req.method === 'GET' && !req.headers['if-range']
+          && /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+        let slice;
+        if (range && (range[1] || range[2])) {
+          const start = range[1] ? Number(range[1]) : Math.max(0, stat.size - Number(range[2]));
+          const end = range[1] && range[2] ? Math.min(Number(range[2]), stat.size - 1) : stat.size - 1;
+          if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start >= stat.size || end < start) {
+            res.writeHead(416, { 'Content-Range': `bytes */${stat.size}` });
+            res.end();
+            return;
+          }
+          slice = { start, end };
+          headers['Content-Length'] = end - start + 1;
+          headers['Content-Range'] = `bytes ${start}-${end}/${stat.size}`;
+        }
+        res.writeHead(slice ? 206 : 200, headers);
+        if (req.method === 'HEAD') { res.end(); return; }
+        const stream = fs.createReadStream(filePath, slice);
+        stream.on('error', (error) => res.destroy(error));
+        res.on('close', () => stream.destroy());
+        stream.pipe(res);
       });
     } catch (e) {
       res.writeHead(500);

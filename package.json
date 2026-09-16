@@ -10,7 +10,8 @@
     "test:browser": "node verify/verify.mjs",
     "test:journey": "node --test verify/journey.test.mjs",
     "test:journey-browser": "node verify/journey-browser.mjs",
-    "verify": "node verify/geodesic.test.mjs && node verify/verify.mjs && node --test verify/journey.test.mjs && node verify/journey-browser.mjs"
+    "test:server": "node --test verify/serve.test.mjs",
+    "verify": "node --test verify/serve.test.mjs && node verify/geodesic.test.mjs && node verify/verify.mjs && node --test verify/journey.test.mjs && node verify/journey-browser.mjs"
   },
   "devDependencies": {
     "playwright": "^1.50.0"

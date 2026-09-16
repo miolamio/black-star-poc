@@ -21,7 +21,7 @@ export class JourneyUI {
       <div id="journey-panel" hidden>
         <h2>Exit Music</h2>
         <p class="journey-intro">One journey across the event horizon.<br>The interior is artistic imagery.</p>
-        <label class="journey-file">Local recording<input id="journey-file" type="file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac"></label>
+        <label class="journey-file">Change recording<input id="journey-file" type="file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac"></label>
         <p id="journey-recording">Choose your local recording. Audio stays on this device.</p>
         <div class="journey-buttons">
           <button id="journey-start" disabled>Start</button>
@@ -110,7 +110,7 @@ export class JourneyUI {
     this.$('recording').textContent = t.name
       ? `${t.name} · ${t.loaded ? t.duration.toFixed(3) + ' s' : t.status === 'loading' ? 'Loading…' : 'Unavailable'}`
       : 'Choose your local recording. Audio stays on this device.';
-    this.$('start').textContent = app.journeyActive ? 'Resume' : 'Start';
+    this.$('start').textContent = app.journeyActive && t.time > 0 ? 'Resume' : 'Start';
     this.$('start').disabled = !t.loaded || t.playing || app.music.busy || app.contextLost;
     this.$('pause').disabled = !t.playing && t.status !== 'starting';
     this.$('restart').disabled = !t.loaded || app.music.busy || app.contextLost;

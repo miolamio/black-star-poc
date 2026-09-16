@@ -17,7 +17,7 @@ URL-driven deterministic screenshot mode.
 
 ## Quick start
 
-Requirements: any static file server and a browser with WebGL 2 (Chrome, Edge, Firefox,
+Requirements: a static file server with byte-range support for audio seeking and a browser with WebGL 2 (Chrome, Edge, Firefox,
 Safari 15+). Node 18+ is only needed for the bundled server and the verification scripts.
 
 ```
@@ -25,21 +25,26 @@ cd black-star-poc
 npm start                       # zero-dependency server on http://127.0.0.1:8080/
 ```
 
-or, with Python:
+or run the bundled server directly:
 
 ```
-python3 -m http.server 8080     # then open http://localhost:8080/
+node verify/serve.mjs 8080      # then open http://localhost:8080/
 ```
 
-Open the URL, wait for "Compiling geodesic kernel…" to finish (one to three seconds on a
-discrete GPU), and drag on the canvas to take the camera.
+Open the URL and wait for "Compiling geodesic kernel…" to finish. The performance loads
+its recording automatically. For the laboratory, open `?journey=off` and drag on the canvas
+to take the camera.
 
 ## Exit Music performance
 
-Open **Exit Music · performance**, choose your local recording, then press **Start**.
-The supplied recording is `14 - Radiohead - Exit Music (For a Film).mp3` (265.227 seconds).
-Select it from your own files; the app does not upload or bundle it. Local media belongs
-outside the repository or in the ignored `media/` directory. Nothing autoplays.
+The page loads `media/exit-music.mp3` and starts the recording and journey together
+from 0:00. If the browser blocks sound autoplay, the opening frame waits for **Start**;
+there is no file-selection step. **Change recording** still lets you select another file.
+The supplied recording is `14 - Radiohead - Exit Music (For a Film).mp3` (265.227 seconds),
+copied to that local path. The `media/` directory remains ignored by Git; after cloning,
+place your recording there or select it through the controls if the default is missing.
+Use `?journey=off` to open the laboratory without loading or playing music. Deterministic
+screenshot URLs never load or play a recording.
 
 The camera approaches once, reveals the black hole early through a changing viewing
 angle, and resolves the evolving disk before a concentrated plunge. After the crossing,
@@ -152,17 +157,18 @@ remembered.
 
 ## URL parameters and screenshot mode
 
-Every key below works in interactive mode; `shot=1` switches to deterministic screenshot mode.
+Use `journey=off` for the interactive laboratory parameters below; `shot=1` switches to deterministic screenshot mode.
 
 ```
 ?shot=1&w=1920&h=1080&preset=interstellar&quality=high&t=12.5&seed=7
 ?shot=1&w=1280&h=720&preset=lensing&path=rise&t=20&debug=9
 ?shot=1&w=1280&h=720&cam=0,9,4&look=0,0,0&fov=70&exposure=1.4&diskTemperature=12000
-?preset=quasar&debug=5                      (interactive, opens in debug view 5)
+?journey=off&preset=quasar&debug=5           (laboratory, opens in debug view 5)
 ```
 
 | Key | Meaning |
 | --- | --- |
+| `journey=off` | Open the laboratory without loading or starting the soundtrack |
 | `shot=1` | Freeze time, hide UI, force DPR 1, render one frame, then set `body[data-ready="1"]` and `window.__gargantua.ready = true` |
 | `w`, `h` | Canvas size in pixels (screenshot mode) |
 | `t` | Simulation time in seconds (turbulence phase and camera-path position) |
