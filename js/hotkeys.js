@@ -2,11 +2,25 @@
 
 export function installHotkeys(app) {
   const handler = (e) => {
+    if (app.journeyActive && e.key === 'Escape') { app.stopJourney(); e.preventDefault(); return; }
     const tag = (e.target && e.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
 
     const k = e.key;
+    if ((tag === 'BUTTON' || tag === 'SUMMARY') && (k === ' ' || k === 'Enter')) return;
+    if (app.journeyActive) {
+      switch (k.toLowerCase()) {
+        case ' ': app.music.playing ? app.pauseJourney() : app.startJourney(); e.preventDefault(); break;
+        case 'escape': app.stopJourney(); break;
+        case 'g': app.journeyUI.toggle(); break;
+        case 'q': app.cycleQuality(); break;
+        case 'f': app.toggleFullscreen(); break;
+        case 's': app.saveScreenshot(); break;
+        default: return;
+      }
+      return;
+    }
     if (k >= '0' && k <= '9') {
       app.setDebug(Number(k));
       e.preventDefault();

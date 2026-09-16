@@ -8,7 +8,9 @@
     "start": "node verify/serve.mjs 8080",
     "test:geodesic": "node verify/geodesic.test.mjs",
     "test:browser": "node verify/verify.mjs",
-    "verify": "node verify/geodesic.test.mjs && node verify/verify.mjs"
+    "test:journey": "node --test verify/journey.test.mjs",
+    "test:journey-browser": "node verify/journey-browser.mjs",
+    "verify": "node verify/geodesic.test.mjs && node verify/verify.mjs && node --test verify/journey.test.mjs && node verify/journey-browser.mjs"
   },
   "devDependencies": {
     "playwright": "^1.50.0"

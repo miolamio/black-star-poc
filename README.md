@@ -34,6 +34,56 @@ python3 -m http.server 8080     # then open http://localhost:8080/
 Open the URL, wait for "Compiling geodesic kernel…" to finish (one to three seconds on a
 discrete GPU), and drag on the canvas to take the camera.
 
+## Exit Music performance
+
+Open **Exit Music · performance**, choose your local recording, then press **Start**.
+The supplied recording is `14 - Radiohead - Exit Music (For a Film).mp3` (265.227 seconds).
+Select it from your own files; the app does not upload or bundle it. Local media belongs
+outside the repository or in the ignored `media/` directory. Nothing autoplays.
+
+The camera approaches once, reveals the black hole early through a changing viewing
+angle, and resolves the evolving disk before a concentrated plunge. After the crossing,
+small directional streaks thin by decreasing their count to rare flashes on black.
+**The interior is artistic imagery, not a physical simulation of a black-hole interior.**
+The recording plays once, with its own recorded fade. After it ends, the visual tail
+continues silently and indefinitely until **Stop**; neither the music nor approach loops.
+
+**The crossing at 218 seconds is provisional and has not been calibrated by ear.** Open
+**Timing cues**, scrub near the closing vocal climax, listen, and adjust **Crossing** and
+**Plunge starts**. Apply the cues together: they must remain strictly ordered and inside
+the recording, with the reveal complete in the first third. Invalid edits leave the last
+valid cues active. A replacement recording preserves cue seconds and shows a duration
+warning; shorter files require valid cues before Start. Cues and file selection are local
+to the current page session. Reloading restores the provisional defaults.
+
+The timeline seeks and reconstructs the scene even before starting. **Pause / Resume**
+controls music and imagery together; **Restart** explicitly begins at zero. **Stop** returns
+to the laboratory view and restores its camera and settings. Controls collapse on Start;
+use the visible **Exit Music · controls** button or **G** to reopen them. During a performance:
+**Space** pauses/resumes, **Esc** stops, **Q** changes quality, **F** toggles fullscreen, and
+**S** saves a PNG. Camera dragging and laboratory preset/debug shortcuts are guarded.
+GPU context loss pauses playback; after graphics recover, press **Resume** explicitly.
+
+Capture any performance timestamp without a recording or playback:
+
+```
+?shot=1&journey=exit-music&t=52&seed=7&w=1280&h=720&quality=high
+?shot=1&journey=exit-music&t=385.227&seed=7&w=1280&h=720&quality=high
+```
+
+`t` may continue past the recording end. A fixed timestamp and unsigned integer seed
+reconstruct the same scene on the same GPU. Normal screenshot URLs retain their existing
+behavior. Console automation is available under `window.__gargantua.journey`:
+`state()`, `load(file)`, `start()`, `pause()`, `seek(seconds)`, `restart()`, `stop()`,
+`setAnchors(anchors)`, and `capture(seconds, seed)` (explicit frozen, silent preview).
+Recording seeks are limited to its duration; deterministic captures may sample any
+finite nonnegative time, including the indefinite tail.
+
+`npm run test:journey` checks scene and transport invariants. `npm run test:journey-browser`
+uses generated WAV fixtures to check playback, seeks, the tail, GPU recovery, and phase
+captures. `npm run verify` includes both suites and the existing raytracer regressions.
+Generated captures live under ignored `verify/results/journey/`.
+
 ## Controls
 
 | Key | Action |
@@ -221,7 +271,7 @@ only the four README illustrations are tracked. See the **Verification results**
 
 ## Verification results
 
-Last full run: 2026-09-15 on macOS (Darwin 25.6), Node 24.16, Playwright Chromium 1243
+Last full run: 2026-09-16 on macOS (Darwin 25.6), Node 24.16, Playwright Chromium 1243
 (SwiftShader software WebGL 2). Everything below is produced by `npm run verify`.
 
 ### Numerical integrator (`verify/geodesic.test.mjs`) — 15/15 passed

@@ -17,6 +17,10 @@ import { installHotkeys } from './hotkeys.js';
 import { loadState, saveState } from './storage.js';
 import { downloadCanvasPNG, screenshotName } from './screenshot.js';
 import { installContextRecovery } from './recovery.js';
+import { DEFAULT_ANCHORS, RECORDING_DURATION, sampleJourney, validateAnchors } from './journey.js';
+import { MusicTransport } from './music-transport.js';
+import { InteriorPass } from './interior.js';
+import { JourneyUI } from './journey-ui.js';
 
 const STATE_VERSION = 1;
 
@@ -67,6 +71,13 @@ export class App {
 
     this.pose = makePose();
     this.audio = new AudioEngine();
+    this.music = new MusicTransport();
+    this.journeyAnchors = DEFAULT_ANCHORS;
+    this.journeySeed = 7;
+    this.journeyActive = false;
+    this.journeyCaptureTime = null;
+    this.journeySample = null;
+    this.journeyRequest = 0;
     this._frame = this._frame.bind(this);
   }
 
@@ -82,6 +93,7 @@ export class App {
     this._createUi();
     this._installEvents();
     this._resize();
+    if (this.shot && this.cfg.journey) this.previewJourney(this.cfg.t ?? 0, this.cfg.seed);
 
     // Compile the big kernel before the first frame so the loading overlay stays honest.
     if (this.renderer.extensions.has('KHR_parallel_shader_compile')) {
@@ -165,6 +177,7 @@ export class App {
       const vsLog = gl.getShaderInfoLog(vs) || '';
       this.shaderError = [log, vsLog, fsLog].filter(Boolean).join('\n').trim() || 'unknown shader error';
       this.overlay.show('Shader compilation failed', this.shaderError.slice(0, 1200), { error: true });
+      if (this.journeyActive) this.music.pause();
       this.stop();
     };
     const ext = renderer.extensions;
@@ -249,6 +262,7 @@ export class App {
     this.hud.setLegendVisible(this.state.legend);
     this.gui = new Gui(this, this.guiRoot);
     this.gui.setVisible(this.state.gui);
+    this.journeyUI = new JourneyUI(this, document.getElementById('journey'));
     if (this.state.audio && !this.shot) this._armAudioResume();
   }
 
@@ -260,6 +274,7 @@ export class App {
     this.canvas.addEventListener(
       'pointerdown',
       () => {
+        if (this.journeyActive) return;
         if (this.state.path !== 'free') this.setPath('free');
       },
       { capture: true }
@@ -267,8 +282,14 @@ export class App {
     installContextRecovery(this.canvas, {
       onLost: () => {
         this.contextLost = true;
+        if (this.journeyActive) {
+          ++this.journeyRequest;
+          this.music.pause();
+          this.journeyUI.setMessage('Graphics interrupted. Resume the performance after recovery.');
+          this.journeyUI.show();
+        }
         this.stop();
-        this.overlay.show('WebGL context lost', 'Waiting for the GPU to come back. Rendering resumes automatically.', { spinner: true });
+        this.overlay.show('WebGL context lost', this.journeyActive ? 'The recording is paused. Resume explicitly after graphics recover.' : 'Waiting for the GPU to come back. Rendering resumes automatically.', { spinner: true });
       },
       onRestored: () => {
         this.contextLost = false;
@@ -310,6 +331,7 @@ export class App {
     const internalH = Math.max(8, Math.round(canvasH * q.resolutionScale));
     this.sceneRT.setSize(internalW, internalH);
     this.post.setSize(internalW, internalH);
+    this.interior?.setSize(internalW, internalH);
     this.uniforms.uResolution.value.set(internalW, internalH);
     this.camera.aspect = internalW / internalH;
     this.camera.updateProjectionMatrix();
@@ -343,7 +365,12 @@ export class App {
     const now = nowMs / 1000;
     const dt = this.lastNow ? Math.min(now - this.lastNow, 0.1) : 1 / 60;
     this.lastNow = now;
-    if (!this.state.paused && !this.shot) this.time += dt;
+    if (!this.journeyActive && !this.state.paused && !this.shot) this.time += dt;
+    if (this.journeyActive) {
+      const time = this.journeyCaptureTime ?? this.music.time();
+      this.journeySample = sampleJourney(time, this.journeyAnchors, this.journeySeed, this.music.duration || RECORDING_DURATION);
+      this.renderParams = { ...PRESETS.interstellar.params, ...this.journeySample.parameters };
+    } else this.renderParams = this.params;
 
     this._updateCamera(dt);
     this._updateUniforms();
@@ -358,6 +385,7 @@ export class App {
     const frameMs = performance.now() - t0;
     this._updateStats(dt, frameMs, nowMs);
     this.hud.update(this.stats, nowMs);
+    this.journeyUI.update();
     this.audio.update({
       camRadius: this.stats.camR,
       camSpeed: this.stats.camSpeed,
@@ -372,7 +400,14 @@ export class App {
 
   _updateCamera(dt) {
     const path = PATHS[this.state.path];
-    if (path && path.pose) {
+    if (this.journeyActive) {
+      const sample = this.journeySample;
+      this.pose.position.fromArray(sample.position);
+      this.pose.target.fromArray(sample.target);
+      this.pose.fov = sample.fov;
+      this.pose.roll = sample.roll;
+      applyPose(this.camera, this.pose);
+    } else if (path && path.pose) {
       path.pose(this.time, this.pose);
       applyPose(this.camera, this.pose);
     } else {
@@ -393,22 +428,26 @@ export class App {
     u.uCamUp.value.set(m[4], m[5], m[6]).normalize();
     u.uCamFwd.value.set(-m[8], -m[9], -m[10]).normalize();
     u.uTanHalfFov.value = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) * 0.5);
-    u.uTime.value = this.time;
-    for (const d of PARAM_DEFS) u[uniformName(d.key)].value = this.params[d.key];
+    u.uTime.value = this.journeyActive ? this.journeySample.time : this.time;
+    for (const d of PARAM_DEFS) u[uniformName(d.key)].value = this.renderParams[d.key];
     const q = QUALITY[this.state.quality];
     u.uMaxSteps.value = q.maxSteps;
     u.uStepScale.value = q.stepScale;
-    u.uDebug.value = this.state.debug;
-    u.uDiskOn.value = this.state.debug === 7 ? 0 : 1;
-    u.uSkyOn.value = this.state.debug === 8 ? 0 : 1;
+    const debug = this.journeyActive ? 0 : this.state.debug;
+    u.uDebug.value = debug;
+    u.uDiskOn.value = debug === 7 ? 0 : 1;
+    u.uSkyOn.value = debug === 8 ? 0 : 1;
   }
 
   _render() {
     const r = this.renderer;
-    r.setRenderTarget(this.sceneRT);
-    r.render(this.rayScene, this.rayCam);
-    const grainSeed = this.shot ? Math.floor(this.cfg.seed) : this.frameIndex % 4096;
-    this.post.render(this.sceneRT, this.params, this.state.debug, grainSeed, this.stats.canvasW, this.stats.canvasH);
+    if (this.journeyActive && this.journeySample.interior) this.interior.render(r, this.sceneRT, this.journeySample);
+    else {
+      r.setRenderTarget(this.sceneRT);
+      r.render(this.rayScene, this.rayCam);
+    }
+    const grainSeed = this.journeyActive ? this.journeySeed : this.shot ? Math.floor(this.cfg.seed) : this.frameIndex % 4096;
+    this.post.render(this.sceneRT, this.renderParams, this.journeyActive ? 0 : this.state.debug, grainSeed, this.stats.canvasW, this.stats.canvasH);
     r.setRenderTarget(null);
   }
 
@@ -428,13 +467,13 @@ export class App {
     s.fov = this.camera.fov;
     s.quality = QUALITY[this.state.quality].name;
     s.preset = getPreset(this.state.preset).name;
-    s.path = PATHS[this.state.path].name;
-    s.paused = this.state.paused;
+    s.path = this.journeyActive ? `Exit Music · ${this.journeySample.phase}` : PATHS[this.state.path].name;
+    s.paused = this.journeyActive ? !this.music.playing : this.state.paused;
     s.maxSteps = QUALITY[this.state.quality].maxSteps;
     s.rays = s.internalW * s.internalH;
     s.maxCrossings = this.params.maxCrossings;
     s.zCam = 1 / Math.sqrt(Math.max(1 - 1 / Math.max(s.camR, 1.0001), 1e-6));
-    s.time = this.time;
+    s.time = this.journeyActive ? this.journeySample.time : this.time;
     s.debug = this.state.debug;
     s.audio = this.audio.enabled ? 'on (synth)' : this.audio.available ? 'off · press M' : 'unavailable';
   }
@@ -448,6 +487,7 @@ export class App {
 
   // ------------------------------------------------------------------ actions
   setPreset(key) {
+    if (this.journeyActive) return;
     if (!PRESETS[key]) return;
     const preset = PRESETS[key];
     this.state.preset = key;
@@ -463,6 +503,7 @@ export class App {
   }
 
   resetParams() {
+    if (this.journeyActive) return;
     const preset = PRESETS[this.state.preset];
     Object.assign(this.params, clampParams(preset.params));
     this.gui.refresh();
@@ -470,6 +511,7 @@ export class App {
   }
 
   setPath(key, { fromPreset = false } = {}) {
+    if (this.journeyActive) return;
     if (!PATHS[key]) return;
     const wasFree = this.state.path === 'free';
     this.state.path = key;
@@ -512,6 +554,7 @@ export class App {
   }
 
   setDebug(n) {
+    if (this.journeyActive) return;
     n = Math.max(0, Math.min(9, n | 0));
     this.state.debug = n;
     this.gui.refresh();
@@ -519,11 +562,13 @@ export class App {
   }
 
   setPaused(v) {
+    if (this.journeyActive) return v ? this.pauseJourney() : this.startJourney();
     this.state.paused = !!v;
     this.gui.refresh();
   }
 
   resetTime() {
+    if (this.journeyActive) return;
     this.time = 0;
   }
 
@@ -547,8 +592,10 @@ export class App {
   }
 
   async setAudio(v) {
+    if (this.journeyActive) return;
     if (v) {
       const ok = await this.audio.enable();
+      if (this.journeyActive) { this._silenceSynth(); return; }
       this.state.audio = ok;
     } else {
       this.audio.disable();
@@ -607,9 +654,112 @@ export class App {
     return true;
   }
 
+  // ------------------------------------------------------ music performance
+  _silenceSynth() {
+    this.audio.disable();
+    const { ctx, n } = this.audio;
+    if (!ctx || !n) return;
+    n.master.gain.cancelScheduledValues(0);
+    n.master.gain.value = 0;
+    ctx.suspend().catch(() => {});
+  }
+
+  _enterJourney() {
+    if (this.journeyActive) return;
+    if (this.saveTimer) { clearTimeout(this.saveTimer); this.saveTimer = 0; this._save(); }
+    this.labCamera = {
+      position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone(),
+      up: this.camera.up.clone(), fov: this.camera.fov, target: this.controls.target.clone(),
+      synth: this.audio.enabled, quality: this.state.quality,
+    };
+    this.journeyActive = true;
+    this.controls.enabled = false;
+    this._silenceSynth();
+    this.interior = new InteriorPass();
+    this.interior.setSize(this.stats.internalW, this.stats.internalH);
+    document.body.classList.add('performing');
+    this.guiRoot.inert = true;
+  }
+
+  async loadRecording(file) {
+    this.stopJourney();
+    return this.music.load(file);
+  }
+
+  async startJourney({ restart = false } = {}) {
+    if (this.contextLost) return false;
+    try { validateAnchors(this.journeyAnchors, this.music.duration); }
+    catch (error) { this.journeyUI.setMessage(this.music.loaded ? error.message : 'Choose a local recording first.'); return false; }
+    if (!this.music.loaded) return false;
+    const request = ++this.journeyRequest;
+    const entering = !this.journeyActive;
+    this._enterJourney();
+    this.journeyCaptureTime = null;
+    const ok = await (restart ? this.music.restart() : this.music.play());
+    if (request !== this.journeyRequest) return false;
+    if (!ok && entering) this.stopJourney();
+    this.journeyUI.update();
+    return ok;
+  }
+
+  pauseJourney() { ++this.journeyRequest; this.music.pause(); this.journeyUI.update(); }
+  seekJourney(seconds) {
+    ++this.journeyRequest;
+    const result = this.music.seek(seconds);
+    this.journeyCaptureTime = null;
+    this._enterJourney();
+    if (!this.contextLost) this._stepOnce(performance.now());
+    return result;
+  }
+  setJourneyAnchors(anchors) {
+    this.journeyAnchors = validateAnchors(anchors, this.music.duration || RECORDING_DURATION);
+    this.journeyUI.syncCues();
+    return { ...this.journeyAnchors };
+  }
+  previewJourney(seconds, seed = this.journeySeed) {
+    // Explicit deterministic preview/capture: never starts audio or changes cues.
+    sampleJourney(seconds, this.journeyAnchors, seed, this.music.duration || RECORDING_DURATION);
+    this.pauseJourney();
+    this._enterJourney();
+    this.journeyCaptureTime = seconds;
+    this.journeySeed = seed;
+    this._stepOnce(performance.now());
+    return this.journeySnapshot();
+  }
+  journeySnapshot() {
+    return { active: this.journeyActive, preview: this.journeyCaptureTime !== null,
+      transport: this.music.snapshot(), anchors: { ...this.journeyAnchors },
+      provisionalCrossing: true, seed: this.journeySeed,
+      scene: this.journeySample ? structuredClone(this.journeySample) : null };
+  }
+  stopJourney() {
+    ++this.journeyRequest;
+    this.music.stop();
+    this.journeyCaptureTime = null;
+    if (!this.journeyActive) return;
+    this.journeyActive = false;
+    this.journeySample = null;
+    this.interior.dispose();
+    this.interior = null;
+    const saved = this.labCamera;
+    this.camera.position.copy(saved.position);
+    this.camera.quaternion.copy(saved.quaternion);
+    this.camera.up.copy(saved.up);
+    this.camera.fov = saved.fov;
+    this.camera.updateProjectionMatrix();
+    this.controls.target.copy(saved.target);
+    if (this.state.quality !== saved.quality) this.setQuality(saved.quality);
+    this.controls.enabled = this.state.path === 'free';
+    this._prevCamPos.copy(this.camera.position);
+    if (saved.synth) this.setAudio(true);
+    document.body.classList.remove('performing');
+    this.guiRoot.inert = false;
+    this.journeyUI?.update();
+  }
+
   // ------------------------------------------------------------------ persistence
   _scheduleSave() {
-    if (this.shot) return;
+    if (this.shot || this.journeyActive) return;
     if (this.saveTimer) clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => {
       this.saveTimer = 0;
@@ -618,6 +768,7 @@ export class App {
   }
 
   _save() {
+    if (this.journeyActive) return;
     const camera = {
       position: this.camera.position.toArray(),
       target: this.controls.target.toArray(),
@@ -653,6 +804,17 @@ export class App {
       setPath: (k) => this.setPath(k),
       renderOnce: () => this._stepOnce(performance.now()),
       simulateContextLoss: () => this.simulateContextLoss(),
+      journey: {
+        state: () => this.journeySnapshot(),
+        load: (file) => this.loadRecording(file),
+        start: () => this.startJourney(),
+        pause: () => this.pauseJourney(),
+        seek: (seconds) => this.seekJourney(seconds),
+        restart: () => this.startJourney({ restart: true }),
+        stop: () => this.stopJourney(),
+        setAnchors: (anchors) => this.setJourneyAnchors(anchors),
+        capture: (seconds, seed = 7) => this.previewJourney(seconds, seed),
+      },
     };
   }
 }

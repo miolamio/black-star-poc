@@ -4,6 +4,7 @@
 //                      document.body.dataset.ready = "1" and window.__gargantua.ready = true
 //   &t=12.5            simulation time (seconds) used for disk turbulence and camera paths
 //   &seed=7            film-grain seed
+//   &journey=exit-music explicit deterministic performance capture (no recording needed)
 //   &preset=quasar     preset key (interstellar | quasar | ember | lensing)
 //   &path=orbit        camera path key (orbit | flyby | plunge | rise | free)
 //   &cam=x,y,z         explicit camera position (rs units); implies path=free
@@ -38,6 +39,7 @@ export function parseUrlConfig(search = window.location.search) {
   const cfg = {
     shot: q.get('shot') === '1' || q.get('shot') === 'true',
     download: q.get('download') === '1',
+    journey: q.get('journey') === 'exit-music',
     t: num(q.get('t'), null),
     seed: num(q.get('seed'), 1),
     preset: q.get('preset'),
