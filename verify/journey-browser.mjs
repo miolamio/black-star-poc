@@ -40,14 +40,22 @@ function pixels() {
   canvas.width = source.width; canvas.height = source.height;
   const ctx = canvas.getContext('2d'); ctx.drawImage(source, 0, 0);
   const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-  let max = 0, lit = 0, sum = 0, hash = 2166136261 >>> 0;
+  let max = 0, lit = 0, sum = 0, red = 0, blue = 0, bright = 0, outerSum = 0, outerCount = 0, hash = 2166136261 >>> 0;
   for (let i = 0; i < data.length; i += 4) {
     const light = Math.max(data[i], data[i + 1], data[i + 2]);
     max = Math.max(max, light); if (light > 6) lit++;
     sum += (data[i] + data[i + 1] + data[i + 2]) / 3;
+    red += data[i]; blue += data[i + 2];
+    if (light > 180) bright++;
+    const x = (i / 4) % canvas.width, y = Math.floor(i / 4 / canvas.width);
+    if (x < canvas.width * .25 || x > canvas.width * .75 || y < canvas.height * .25 || y > canvas.height * .75) {
+      outerSum += (data[i] + data[i + 1] + data[i + 2]) / 3; outerCount++;
+    }
     for (let c = 0; c < 3; c++) { hash ^= data[i + c]; hash = Math.imul(hash, 16777619) >>> 0; }
   }
-  return { max, litFraction: lit / (data.length / 4), mean: sum / (data.length / 4), hash, scene: app.journey.state().scene };
+  return { max, litFraction: lit / (data.length / 4), mean: sum / (data.length / 4),
+    red: red / (data.length / 4), blue: blue / (data.length / 4), brightFraction: bright / (data.length / 4),
+    outerMean: outerSum / outerCount, hash, scene: app.journey.state().scene };
 }
 
 const pw = await loadPlaywright();
@@ -245,6 +253,7 @@ try {
   await page.evaluate(() => window.__gargantua.journey.seek(222));
   await page.setViewportSize({ width: 720, height: 480 });
   await page.waitForFunction(() => window.__gargantua.app.interior.material.uniforms.uAspect.value === 1.5);
+  assert.equal(await page.evaluate(() => window.__gargantua.app.interior.fieldMaterial.uniforms.uAspect.value), 1.5);
   await page.setViewportSize({ width: 640, height: 360 });
   await page.waitForFunction(() => Math.abs(window.__gargantua.app.interior.material.uniforms.uAspect.value - 640 / 360) < 0.001);
   const first = await page.evaluate(pixels);
@@ -252,7 +261,7 @@ try {
   await page.evaluate(() => window.__gargantua.journey.seek(222));
   const second = await page.evaluate(pixels);
   assert.equal(first.hash, second.hash);
-  assert.ok(first.max >= 35 && first.max < 170, `interior highlight max ${first.max}`);
+  assert.ok(first.max > 200, `interior stars must be bright: ${first.max}`);
   assert.ok(first.mean < 3 && first.litFraction < 0.06, `interior must stay dark: ${JSON.stringify(first)}`);
 
   await page.evaluate(() => window.__gargantua.journey.start());
@@ -345,13 +354,20 @@ try {
   console.log('PASS  recording, scrub, playback, pause, seek, restart, end, +120 s silent tail, stop, GPU recovery, laboratory isolation, cue validation');
 
   const captures = [];
-  for (const time of [0, 52, 160, 208, 217, 218, 222, 245, 265.227, 385.227, 385.427, 385.827, 386.227]) {
+  for (const time of [0, 52, 160, 208, 217, 218, 218.16, 222, 222.4, 245, 265.227, 385.227, 385.427, 385.827, 386.227]) {
     await page.goto(`${base}?shot=1&journey=exit-music&t=${time}&seed=7&w=640&h=360&quality=medium`);
     await page.waitForFunction(() => window.__gargantua?.ready);
     const capture = await page.evaluate(pixels);
     captures.push({ time, ...capture });
     if (time === 208 || time === 217) assert.ok(capture.litFraction > 0.005, `premature blackout at ${time}`);
-    if (time >= 218) { assert.ok(capture.mean < 3); assert.ok(capture.litFraction < 0.06); assert.ok(capture.max < 170); }
+    if (time === 0) assert.ok(capture.outerMean > 15, 'procedural galaxy must be visible behind the opening');
+    if (time === 52 || time === 160) assert.ok(capture.blue > capture.red * 1.3, 'exterior must retain saturated cold colours');
+    if (time >= 218) {
+      assert.ok(capture.mean < 25, 'interior stays dark around local light sources');
+      assert.ok(capture.brightFraction < 0.08, 'flashes stay local');
+      if (capture.scene.flash.strength === 0) assert.ok(capture.litFraction < 0.06);
+    }
+    if (time === 218.16 || time === 222.4) assert.ok(capture.max > 220 && capture.brightFraction > 0.004, 'lightning needs visible bright flashes');
     if (time <= 245) await page.locator('#view').screenshot({ path: path.join(OUT, `phase-${time}.png`) });
     assert.equal(await page.evaluate(() => window.__gargantua.journey.state().transport.loaded), false);
   }
@@ -361,9 +377,32 @@ try {
   await page.goto(`${base}?shot=1&journey=exit-music&t=222&seed=7&w=640&h=360&quality=medium`);
   await page.waitForFunction(() => window.__gargantua?.ready);
   assert.equal((await page.evaluate(pixels)).hash, captures.find((capture) => capture.time === 222).hash);
+  // The enlarged disk must not exhaust low/medium ray budgets and leave black
+  // strips. Inspect the existing termination diagnostic, not an implementation value.
+  for (const quality of ['low', 'medium']) {
+    await page.goto(`${base}?shot=1&journey=exit-music&t=0&seed=7&w=640&h=360&quality=${quality}`);
+    await page.waitForFunction(() => window.__gargantua?.ready);
+    const exhausted = await page.evaluate(() => {
+      const a = window.__gargantua.app;
+      a.uniforms.uDebug.value = 6;
+      a.renderer.setRenderTarget(a.sceneRT);
+      a.renderer.render(a.rayScene, a.rayCam);
+      a.post.render(a.sceneRT, a.renderParams, 6, 7, a.stats.canvasW, a.stats.canvasH);
+      const canvas = document.createElement('canvas');
+      canvas.width = a.canvas.width; canvas.height = a.canvas.height;
+      const ctx = canvas.getContext('2d'); ctx.drawImage(a.canvas, 0, 0);
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let exhausted = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i] > 155 && data[i] < 190 && data[i + 1] > 50 && data[i + 1] < 80 && Math.abs(data[i + 1] - data[i + 2]) < 5) exhausted++;
+      }
+      return exhausted / (data.length / 4);
+    });
+    assert.ok(exhausted < 0.004, `${quality}: ray budget exhausted for ${(exhausted * 100).toFixed(2)}% of the opening`);
+  }
   assert.equal(errors.length, 0, errors.join('\n'));
   fs.writeFileSync(path.join(OUT, 'report.json'), JSON.stringify({ captures, errors }, null, 2));
-  console.log(`PASS  deterministic phase captures, visible pre-crossing disk, dark interior, animated sparse tail (${OUT})`);
+  console.log(`PASS  deterministic captures, procedural galaxy, cold disk, local lightning, animated sparse tail (${OUT})`);
 } finally {
   await browser?.close();
   await new Promise((resolve) => server.close(resolve));

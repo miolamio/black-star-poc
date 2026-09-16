@@ -46,9 +46,14 @@ place your recording there or select it through the controls if the default is m
 Use `?journey=off` to open the laboratory without loading or playing music. Deterministic
 screenshot URLs never load or play a recording.
 
-The camera approaches once, reveals the black hole early through a changing viewing
-angle, and resolves the evolving disk before a concentrated plunge. After the crossing,
-small directional streaks thin by decreasing their count to rare flashes on black.
+The camera approaches once with continuously increasing inward speed, reveals the black
+hole early through a changing viewing angle, and adds the sharpest acceleration only at
+the end. A procedural galaxy with stars and dust lanes fills the background: no raster
+sky texture is used. The performance disk extends to 22 Schwarzschild radii and uses
+bright blue/cyan grading; laboratory presets retain their original colours.
+After the crossing, 480 perspective stars fly toward the viewer, with brief lightning
+arcs and backlit cloud silhouettes. Stars thin by decreasing their count to three, and
+lightning becomes rare; the light stays local against black space.
 **The interior is artistic imagery, not a physical simulation of a black-hole interior.**
 The recording plays once, with its own recorded fade. After it ends, the visual tail
 continues silently and indefinitely until **Stop**; neither the music nor approach loops.

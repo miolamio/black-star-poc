@@ -238,6 +238,7 @@ export class App {
       uDebug: { value: 0 },
       uDiskOn: { value: 1 },
       uSkyOn: { value: 1 },
+      uPerformance: { value: 0 },
     };
     for (const d of PARAM_DEFS) uniforms[uniformName(d.key)] = { value: d.def };
     this.uniforms = uniforms;
@@ -430,9 +431,12 @@ export class App {
     u.uCamFwd.value.set(-m[8], -m[9], -m[10]).normalize();
     u.uTanHalfFov.value = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) * 0.5);
     u.uTime.value = this.journeyActive ? this.journeySample.time : this.time;
+    u.uPerformance.value = this.journeyActive ? 1 : 0;
     for (const d of PARAM_DEFS) u[uniformName(d.key)].value = this.renderParams[d.key];
     const q = QUALITY[this.state.quality];
-    u.uMaxSteps.value = q.maxSteps;
+    // The wider performance disk and distant opening need a longer ray budget;
+    // low quality still reduces resolution, without cutting black strips in the sky.
+    u.uMaxSteps.value = this.journeyActive ? Math.max(240, q.maxSteps) : q.maxSteps;
     u.uStepScale.value = q.stepScale;
     const debug = this.journeyActive ? 0 : this.state.debug;
     u.uDebug.value = debug;
@@ -470,7 +474,7 @@ export class App {
     s.preset = getPreset(this.state.preset).name;
     s.path = this.journeyActive ? `Exit Music · ${this.journeySample.phase}` : PATHS[this.state.path].name;
     s.paused = this.journeyActive ? !this.music.playing : this.state.paused;
-    s.maxSteps = QUALITY[this.state.quality].maxSteps;
+    s.maxSteps = this.uniforms.uMaxSteps.value;
     s.rays = s.internalW * s.internalH;
     s.maxCrossings = this.params.maxCrossings;
     s.zCam = 1 / Math.sqrt(Math.max(1 - 1 / Math.max(s.camR, 1.0001), 1e-6));

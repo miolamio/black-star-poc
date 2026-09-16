@@ -5,7 +5,7 @@ export const DEFAULT_ANCHORS = Object.freeze({
   thinningStart: 230, sparseAt: 260,
 });
 export const ANCHOR_KEYS = Object.keys(DEFAULT_ANCHORS);
-export const PARTICLE_COUNT = 160;
+export const PARTICLE_COUNT = 480;
 export const SPARSE_COUNT = 3;
 
 export function validateAnchors(anchors, duration = RECORDING_DURATION) {
@@ -36,17 +36,17 @@ export function sampleJourney(time, anchors = DEFAULT_ANCHORS, seed = 7, duratio
   const reveal = smooth(progress(time, a.revealStart, a.revealEnd));
   const approach = progress(time, a.revealEnd, a.plungeStart);
   const plunge = progress(time, a.plungeStart, a.crossing);
-  // Each segment only moves inward. The rapid fall is concentrated near crossing.
-  const radius = time <= a.revealEnd
-    ? mix(58, 26, time / a.revealEnd)
-    : time <= a.plungeStart
-      ? 26 * Math.pow(8.5 / 26, approach)
-      : mix(8.5, 1, plunge ** 12);
+  // One continuously accelerating approach. The last term joins with zero
+  // velocity/acceleration, adding the final fall without a speed discontinuity.
+  const inward = progress(time, 0, a.crossing);
+  const radius = time >= a.crossing ? 1 : mix(82, 1, 0.2 * inward + 0.7 * inward ** 2.4 + 0.1 * plunge ** 8);
   const elevation = mix(0.006, 0.28, reveal) - 0.17 * smooth(approach);
   const azimuth = 0.18 * reveal + 0.24 * smooth(approach);
   const detail = mix(0.15, 1, smooth(progress(time, 0, a.plungeStart)));
   const thinning = smooth(progress(time, a.thinningStart, a.sparseAt));
   const interior = time >= a.crossing;
+  const motionTime = Math.max(0, time - a.crossing);
+  const particleCount = interior ? Math.max(SPARSE_COUNT, Math.ceil(mix(PARTICLE_COUNT, SPARSE_COUNT, thinning))) : 0;
   const phase = time < a.revealStart ? 'opening' : time < a.revealEnd ? 'reveal'
     : time < a.plungeStart ? 'approach' : !interior ? 'plunge'
       : time < a.thinningStart ? 'interior' : time < a.sparseAt ? 'thinning' : 'sparse';
@@ -54,14 +54,16 @@ export function sampleJourney(time, anchors = DEFAULT_ANCHORS, seed = 7, duratio
     time, seed, phase, interior, silentTail: time >= duration, radius, detail,
     position: [radius * Math.cos(elevation) * Math.sin(azimuth), radius * Math.sin(elevation), radius * Math.cos(elevation) * Math.cos(azimuth)],
     target: [0, 0, 0], fov: 48, roll: 0,
-    motionTime: Math.max(0, time - a.crossing),
-    particleCount: interior ? Math.max(SPARSE_COUNT, Math.ceil(mix(PARTICLE_COUNT, SPARSE_COUNT, thinning))) : 0,
+    motionTime, particleCount,
+    flash: interior ? sampleInteriorFlash(motionTime, seed, particleCount / PARTICLE_COUNT) : { strength: 0, angle: 0, shape: 0 },
     // Transient values, never written to the laboratory parameter object.
     parameters: {
       turbulence: mix(0.28, 0.88, detail), turbulenceScale: mix(0.65, 1.65, detail),
-      diskBrightness: 1.05, diskSpin: 1.1, starDensity: 0.35, starBrightness: 0.4,
-      milkyWay: 0.12, exposure: interior ? 0.8 : 0.85, grain: 0,
-      bloomStrength: interior ? 0 : 0.3, chromaticAberration: 0,
+      diskOuter: 22, diskDensity: 1.35, diskTemperature: 22000,
+      diskBrightness: 2.8, diskSpin: 1.25, starDensity: 1.2, starBrightness: 1.25,
+      milkyWay: 2.2, exposure: interior ? 1.05 : 1.1, grain: 0,
+      bloomStrength: interior ? 0.5 : 0.42, bloomThreshold: 0.7, bloomRadius: 0.75,
+      vignette: interior ? 0.2 : 0.28, chromaticAberration: 0,
     },
   };
 }
@@ -76,16 +78,31 @@ function random(id, seed, salt) {
 // Stable identity determines direction, speed and brightness. Density only removes
 // identities from the end of the list; remaining particles do not globally fade.
 export function sampleParticle(id, motionTime, seed = 7) {
-  const angle = (id % 2 ? Math.PI : 0) + (random(id, seed, 1) - 0.5) * 1.7;
-  const speed = 0.48 + random(id, seed, 2) * 0.3;
+  const angle = random(id, seed, 1) * Math.PI * 2;
+  const speed = 0.22 + random(id, seed, 2) * 0.18;
   const travel = (motionTime * speed + random(id, seed, 3)) % 1;
-  const radius = 0.08 + 2.9 * travel ** 4;
-  const length = 0.006 + 0.27 * travel ** 5;
-  const envelope = smooth(progress(travel, 0.42, 0.65)) * (1 - smooth(progress(travel, 0.94, 1)));
+  // Perspective projection: stars accelerate outward as their depth approaches
+  // the viewer; their heads grow into long trails before leaving the frame.
+  const depth = Math.max(0.035, 1 - travel);
+  const radius = (0.025 + random(id, seed, 6) * 0.22) / depth ** 1.3;
+  const length = 0.0018 + 0.011 * travel ** 3 / depth ** 1.5;
+  const envelope = smooth(progress(travel, 0, 0.08)) * (1 - smooth(progress(travel, 0.96, 1)));
   return {
     id, x: Math.cos(angle) * radius, y: Math.sin(angle) * radius,
     dx: Math.cos(angle) * length, dy: Math.sin(angle) * length,
-    width: 0.0022 + random(id, seed, 4) * 0.0032,
-    brightness: (0.10 + random(id, seed, 5) * 0.16) * envelope,
+    width: (0.0012 + random(id, seed, 4) * 0.0024) * (0.5 + travel),
+    brightness: (0.7 + random(id, seed, 5) * 2.8) * (0.2 + travel * travel) * envelope,
+    hue: random(id, seed, 7),
+  };
+}
+
+export function sampleInteriorFlash(motionTime, seed = 7, activity = 1) {
+  const event = Math.floor(motionTime / 4.2);
+  const age = motionTime % 4.2;
+  const eligible = random(event, seed, 9) < Math.max(0.08, activity);
+  return {
+    strength: eligible ? smooth(progress(age, 0, 0.045)) * (1 - smooth(progress(age, 0.12, 0.65))) : 0,
+    angle: random(event, seed, 10) * Math.PI * 2,
+    shape: random(event, seed, 11) * 100,
   };
 }

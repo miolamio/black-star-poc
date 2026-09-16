@@ -43,6 +43,7 @@ uniform float uStepScale;
 uniform int   uDebug;
 uniform float uDiskOn;
 uniform float uSkyOn;
+uniform float uPerformance;
 
 ${COMMON_GLSL}
 
@@ -114,6 +115,13 @@ DiskSample shadeDisk(vec3 hit, vec3 vel) {
   // Bolometric emission ~ T^4, so the inner ring dominates and the rim fades to embers.
   float emis = pow(max(tprof, 0.0), 4.0) * turb * pow(g, uBeaming);
   vec3 col = blackbodyRGB(max(Tobs, 800.0)) * emis * uDiskBrightness;
+  if (uPerformance > 0.5) {
+    // Art direction for the performance; laboratory blackbody colours remain
+    // unchanged. Lift the outer disk so its extended radius stays visible.
+    vec3 ice = mix(vec3(0.08, 0.22, 0.95), vec3(0.24, 0.78, 1.35), clamp((Tobs - 6000.0) / 16000.0, 0.0, 1.0));
+    col = mix(col, ice * emis * uDiskBrightness, 0.78);
+    col += vec3(0.055, 0.15, 0.38) * uDiskBrightness * pow(tprof, 1.4) * turb;
+  }
 
   s.color = col * alpha;
   s.alpha = alpha;
@@ -149,7 +157,9 @@ vec3 starLayer(vec3 d, float N, float density, float bright, float sigma0, float
 vec3 renderSky(vec3 d, float fp, float pixAng) {
   vec3 col = vec3(0.0);
 
-  float lat  = dot(d, GAL_N);
+  vec3 galN = uPerformance > 0.5 ? normalize(vec3(0.48, 0.84, 0.12)) : GAL_N;
+  vec3 galC = uPerformance > 0.5 ? normalize(vec3(0.35, -0.04, -1.0)) : GAL_C;
+  float lat  = dot(d, galN);
   float band = exp(-lat * lat / (2.0 * 0.13 * 0.13));
   float wide = exp(-lat * lat / (2.0 * 0.32 * 0.32));
 
@@ -157,11 +167,19 @@ vec3 renderSky(vec3 d, float fp, float pixAng) {
   float neb  = fbm5(d * 4.5 + vec3(3.1, 1.7, 9.2));
   float neb2 = fbm4(d * 11.0 + vec3(8.0, 2.0, 4.0));
   float dust = fbm4(d * 7.0 + vec3(1.0, 6.0, 3.0));
-  float toC  = dot(d, GAL_C);
+  float toC  = dot(d, galC);
   float bulge = exp(-(1.0 - toC) * 3.5);
   float lanes = 1.0 - 0.8 * smoothstep(0.48, 0.66, dust) * band;
   float mw = (band * (0.15 + 1.4 * neb * neb + 0.6 * neb2 * neb2) + wide * 0.12 * neb + bulge * band * 0.8) * lanes;
   vec3 mwCol = mix(vec3(0.55, 0.68, 1.0), vec3(1.0, 0.86, 0.66), clamp(neb * 1.4 + bulge * 0.6, 0.0, 1.0));
+  if (uPerformance > 0.5) {
+    float filaments = fbm4(d * 38.0 + vec3(7.0, 2.0, 13.0));
+    float clouds = pow(max(neb2 * 1.7, 0.0), 2.0);
+    float dustLane = smoothstep(0.35, 0.64, dust + (filaments - 0.5) * 0.3);
+    mw = (band * (0.22 + clouds + bulge * 0.8) + wide * neb * 0.15)
+      * (1.0 - 0.92 * dustLane * band) * (0.7 + filaments * 0.8);
+    mwCol = mix(vec3(0.24, 0.2, 0.6), vec3(0.62, 0.78, 1.15), clamp(neb * 0.8 + bulge * 0.3, 0.0, 1.0));
+  }
   col += mwCol * mw * uMilkyWay * 0.16;
 
   // Stars, denser toward the band.

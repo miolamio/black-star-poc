@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_ANCHORS as A, RECORDING_DURATION as D, ANCHOR_KEYS, PARTICLE_COUNT, SPARSE_COUNT,
-  validateAnchors, sampleJourney, sampleParticle } from '../js/journey.js';
+  validateAnchors, sampleJourney, sampleParticle, sampleInteriorFlash } from '../js/journey.js';
 import { MusicTransport } from '../js/music-transport.js';
 
 test('approach never retreats; early reveal and concentrated plunge meet boundaries', () => {
@@ -29,6 +29,22 @@ test('approach never retreats; early reveal and concentrated plunge meet boundar
   }
 });
 
+test('inward speed increases throughout the approach without a jump at a cue', () => {
+  for (const anchors of [A, { revealStart: .1, revealEnd: 1, plungeStart: 2, crossing: 3, thinningStart: 4, sparseAt: 5 }]) {
+    const dt = anchors.crossing / 10000;
+    const speed = (time) => (sampleJourney(time, anchors).radius - sampleJourney(time + dt, anchors).radius) / dt;
+    let previous = 0;
+    for (let time = 0; time < anchors.crossing - dt; time += dt * 10) {
+      const next = speed(time);
+      assert.ok(next >= previous - 1e-8, `deceleration at ${time}`);
+      previous = next;
+    }
+    for (const key of ['revealStart', 'revealEnd', 'plungeStart']) {
+      assert.ok(Math.abs(speed(anchors[key]) - speed(anchors[key] - dt)) < speed(anchors.crossing - dt) * 0.002, key);
+    }
+  }
+});
+
 test('cue validation is strict, preserves seconds and copies input', () => {
   const input = { ...A }, valid = validateAnchors(input);
   input.crossing = 1;
@@ -50,7 +66,7 @@ test('thinning removes stable identities to a nonzero floor without global dimmi
   for (let time = A.thinningStart; time < A.sparseAt + 10; time += 0.1) {
     const next = sampleJourney(time);
     assert.ok(next.particleCount <= count && next.particleCount >= SPARSE_COUNT);
-    assert.equal(next.parameters.exposure, 0.8);
+    assert.equal(next.parameters.exposure, 1.05);
     assert.equal(next.parameters.grain, 0);
     count = next.particleCount;
   }
@@ -63,6 +79,25 @@ test('thinning removes stable identities to a nonzero floor without global dimmi
   assert.deepEqual(sampleParticle(1, at.motionTime, 12), sampleParticle(1, at.motionTime, 12));
   assert.notDeepEqual(sampleParticle(1, 120, 12), sampleParticle(1, 120.2, 12));
   assert.notDeepEqual(sampleParticle(1, 120, 12), sampleParticle(1, 120, 13));
+});
+
+test('interior stars accelerate toward the viewer and flashes become rare in the tail', () => {
+  for (let id = 0; id < 30; id++) {
+    const samples = [0, .001, .002].map((t) => sampleParticle(id, t));
+    const radii = samples.map((p) => Math.hypot(p.x, p.y));
+    if (radii[0] < radii[1] && radii[1] < radii[2]) {
+      assert.ok(radii[2] - radii[1] >= radii[1] - radii[0]);
+      assert.ok(Math.hypot(samples[1].dx, samples[1].dy) >= Math.hypot(samples[0].dx, samples[0].dy));
+    }
+  }
+  assert.equal(sampleInteriorFlash(0.1).strength, 1);
+  assert.equal(sampleInteriorFlash(1).strength, 0);
+  const peak = sampleInteriorFlash(4.3, 7);
+  assert.deepEqual(sampleInteriorFlash(4.3, 7), peak);
+  assert.notEqual(sampleInteriorFlash(8.5, 7).angle, peak.angle);
+  const events = Array.from({ length: 100 }, (_, i) => sampleInteriorFlash(i * 4.2 + .1, 7, SPARSE_COUNT / PARTICLE_COUNT));
+  const flashes = events.filter((event) => event.strength > 0);
+  assert.ok(flashes.length > 0 && flashes.length < 20);
 });
 
 class FakeAudio extends EventTarget {
