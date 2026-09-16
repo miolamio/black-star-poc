@@ -215,8 +215,9 @@ node verify/verify.mjs --gpu   # browser suite on the real GPU instead of SwiftS
 The browser suite resolves Playwright from a local install or from the global
 `@playwright/cli`; otherwise run `npm i -D playwright && npx playwright install chromium`.
 
-Results of the last run are in `verify/results/` (PNG per case, `report.md`, `report.json`,
-`geodesic.json`). See the **Verification results** section below.
+Running the checks writes local results to `verify/results/` (PNG per case, `report.md`,
+`report.json`, `geodesic.json`). Generated reports and test captures are ignored by Git;
+only the four README illustrations are tracked. See the **Verification results** section below.
 
 ## Verification results
 
@@ -251,7 +252,7 @@ Last full run: 2026-09-15 on macOS (Darwin 25.6), Node 24.16, Playwright Chromiu
 | WebGL context loss and restore (`WEBGL_lose_context`) | 1 | overlay shown, rendering resumed, overlay hidden |
 | Default interactive page | 1 | lil-gui present with 21 sliders, HUD rows present |
 
-Per-case PNGs, `report.md`, `report.json` and `geodesic.json` are in `verify/results/`.
+Per-case PNGs, `report.md`, `report.json` and `geodesic.json` are generated in `verify/results/`.
 `hero-<preset>.png` are 1280 × 720 High-quality renders of the four presets:
 
 | Quasar | Ember | Pure Lensing |

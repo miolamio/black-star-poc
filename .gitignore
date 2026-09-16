@@ -1,3 +1,33 @@
 node_modules/
 .DS_Store
-verify/results/*_FAIL.png
+
+# Local agent tools, skills, and workflow artifacts
+/.agents/
+/.claude/
+/.codex/
+/_bmad/
+/_bmad-output/
+/AGENTS.md
+/CLAUDE.md
+/graphify-out/
+/.development/
+/.dev/
+/.playwright-cli/
+
+# Generated verification output; keep the README illustrations
+/verify/results/*
+!/verify/results/hero-interstellar.png
+!/verify/results/hero-quasar.png
+!/verify/results/hero-ember.png
+!/verify/results/hero-lensing.png
+/test-results/
+/playwright-report/
+
+# Local soundtracks, renders, and machine settings
+/media/
+/exports/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
