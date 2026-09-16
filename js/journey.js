@@ -59,7 +59,7 @@ export function sampleJourney(time, anchors = DEFAULT_ANCHORS, seed = 7, duratio
     // Transient values, never written to the laboratory parameter object.
     parameters: {
       turbulence: mix(0.28, 0.88, detail), turbulenceScale: mix(0.65, 1.65, detail),
-      diskOuter: 22, diskDensity: 1.35, diskTemperature: 22000,
+      diskOuter: 22, diskDensity: 1.35, diskTemperature: 18000,
       diskBrightness: 2.8, diskSpin: 1.25, starDensity: 1.2, starBrightness: 1.25,
       milkyWay: 2.2, exposure: interior ? 1.05 : 1.1, grain: 0,
       bloomStrength: interior ? 0.5 : 0.42, bloomThreshold: 0.7, bloomRadius: 0.75,

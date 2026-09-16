@@ -361,7 +361,7 @@ try {
     captures.push({ time, ...capture });
     if (time === 208 || time === 217) assert.ok(capture.litFraction > 0.005, `premature blackout at ${time}`);
     if (time === 0) assert.ok(capture.outerMean > 15, 'procedural galaxy must be visible behind the opening');
-    if (time === 52 || time === 160) assert.ok(capture.blue > capture.red * 1.3, 'exterior must retain saturated cold colours');
+    if (time === 52 || time === 160) assert.ok(capture.blue > capture.red * 1.15, 'exterior must retain the galaxy’s soft blue-violet tones');
     if (time >= 218) {
       assert.ok(capture.mean < 25, 'interior stays dark around local light sources');
       assert.ok(capture.brightFraction < 0.08, 'flashes stay local');
@@ -402,7 +402,7 @@ try {
   }
   assert.equal(errors.length, 0, errors.join('\n'));
   fs.writeFileSync(path.join(OUT, 'report.json'), JSON.stringify({ captures, errors }, null, 2));
-  console.log(`PASS  deterministic captures, procedural galaxy, cold disk, local lightning, animated sparse tail (${OUT})`);
+  console.log(`PASS  deterministic captures, procedural galaxy, pearly disk, local lightning, animated sparse tail (${OUT})`);
 } finally {
   await browser?.close();
   await new Promise((resolve) => server.close(resolve));

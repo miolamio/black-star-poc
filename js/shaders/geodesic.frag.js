@@ -118,9 +118,9 @@ DiskSample shadeDisk(vec3 hit, vec3 vel) {
   if (uPerformance > 0.5) {
     // Art direction for the performance; laboratory blackbody colours remain
     // unchanged. Lift the outer disk so its extended radius stays visible.
-    vec3 ice = mix(vec3(0.08, 0.22, 0.95), vec3(0.24, 0.78, 1.35), clamp((Tobs - 6000.0) / 16000.0, 0.0, 1.0));
-    col = mix(col, ice * emis * uDiskBrightness, 0.78);
-    col += vec3(0.055, 0.15, 0.38) * uDiskBrightness * pow(tprof, 1.4) * turb;
+    vec3 starlight = mix(vec3(0.28, 0.27, 0.62), vec3(0.68, 0.80, 1.15), clamp((Tobs - 6000.0) / 16000.0, 0.0, 1.0));
+    col = mix(col, starlight * emis * uDiskBrightness, 0.78);
+    col += vec3(0.12, 0.15, 0.30) * uDiskBrightness * pow(tprof, 1.4) * turb;
   }
 
   s.color = col * alpha;
@@ -157,10 +157,13 @@ vec3 starLayer(vec3 d, float N, float density, float bright, float sigma0, float
 vec3 renderSky(vec3 d, float fp, float pixAng) {
   vec3 col = vec3(0.0);
 
-  vec3 galN = uPerformance > 0.5 ? normalize(vec3(0.48, 0.84, 0.12)) : GAL_N;
-  vec3 galC = uPerformance > 0.5 ? normalize(vec3(0.35, -0.04, -1.0)) : GAL_C;
+  // A fixed galactic plane spans the performance camera's viewing arc, placing
+  // its luminous band behind the hole throughout the reveal and approach.
+  vec3 galN = uPerformance > 0.5 ? normalize(vec3(-0.5, 0.866, 0.02)) : GAL_N;
+  vec3 galC = uPerformance > 0.5 ? normalize(vec3(-0.29, -0.15, -1.0)) : GAL_C;
   float lat  = dot(d, galN);
-  float band = exp(-lat * lat / (2.0 * 0.13 * 0.13));
+  float bandWidth = uPerformance > 0.5 ? 0.17 : 0.13;
+  float band = exp(-lat * lat / (2.0 * bandWidth * bandWidth));
   float wide = exp(-lat * lat / (2.0 * 0.32 * 0.32));
 
   // Milky Way nebulosity with dust lanes and a warm bulge.

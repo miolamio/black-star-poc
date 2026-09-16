@@ -49,8 +49,9 @@ screenshot URLs never load or play a recording.
 The camera approaches once with continuously increasing inward speed, reveals the black
 hole early through a changing viewing angle, and adds the sharpest acceleration only at
 the end. A procedural galaxy with stars and dust lanes fills the background: no raster
-sky texture is used. The performance disk extends to 22 Schwarzschild radii and uses
-bright blue/cyan grading; laboratory presets retain their original colours.
+sky texture is used. Its luminous band sits behind the hole along the camera's approach.
+The performance disk extends to 22 Schwarzschild radii and uses warmer pearly white
+and blue-violet light to match the galaxy; laboratory presets retain their original colours.
 After the crossing, 480 perspective stars fly toward the viewer, with brief lightning
 arcs and backlit cloud silhouettes. Stars thin by decreasing their count to three, and
 lightning becomes rare; the light stays local against black space.
